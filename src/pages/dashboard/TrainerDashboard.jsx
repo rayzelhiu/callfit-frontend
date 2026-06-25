@@ -93,7 +93,7 @@ export default function TrainerDashboard() {
 
         {sessions.map((s) => (
           <option key={s.id} value={s.id}>
-            {s.template?.name}
+            {s.template?.template_name}
           </option>
         ))}
       </select>
