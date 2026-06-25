@@ -1,0 +1,23 @@
+.workout-btn {
+  border: 2px solid #123473;
+  color: #123473;
+  background: white;
+  transition: .2s;
+}
+
+.workout-btn:hover {
+  background: #123473;
+  color: white;
+}
+
+.cooldown-btn {
+  border: 2px solid #d4af37;
+  color: #d4af37;
+  background: white;
+  transition: .2s;
+}
+
+.cooldown-btn:hover {
+  background: #d4af37;
+  color: white;
+}

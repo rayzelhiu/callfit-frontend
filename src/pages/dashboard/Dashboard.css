@@ -1,0 +1,46 @@
+.btn-primary{
+    background-color: #123473 !important;
+    border-color: #123473 !important;
+}
+
+.btn-primary:hover{
+    background-color: #0f2b60 !important;
+    border-color: #0f2b60 !important;
+}
+
+.btn-primary:focus{
+    background-color: #123473 !important;
+    border-color: #123473 !important;
+    box-shadow: 0 0 0 .2rem rgba(18,52,115,.25) !important;
+}
+
+.btn-primary:active{
+    background-color: #0f2b60 !important;
+    border-color: #0f2b60 !important;
+}
+
+.btn-secondary {
+    background-color: #d1992a !important;
+    border-color: #d1992a !important;
+}
+
+.badge-warmup {
+  background: red;
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
+.badge-workout {
+  background: #123473;
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
+.badge-cooldown {
+  background: #d4af37;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
