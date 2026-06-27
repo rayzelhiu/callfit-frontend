@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import api from "../../api/axios";
 import logo from "../../assets/call_fit.png";
 import { MdTimer } from "react-icons/md";
-import { FiRefreshCw } from "react-icons/fi";
+import { FaExchangeAlt } from "react-icons/fa";
 
 export default function TvScreen() {
 
@@ -212,88 +212,210 @@ useEffect(() => {
           {timer}
         </div>
 
-        <div style={{ background: "#0f2557", padding: "20px 50px", borderRadius: 16, color: "white" }}>
-          SETS {set || "-"}
-        </div>
+        <div
+  style={{
+    background: "#0f2557",
+    padding: "20px 45px",
+    borderRadius: 16,
+    color: "white",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 140,
+    boxShadow: "0 8px 20px rgba(0,0,0,0.25)",
+  }}
+>
+  {/* LABEL */}
+  <div
+    style={{
+      fontSize: 16,
+      letterSpacing: 3,
+      opacity: 0.7,
+      marginBottom: 6,
+    }}
+  >
+    SETS
+  </div>
+
+  {/* VALUE */}
+  <div
+    style={{
+      fontSize: 55,
+      fontWeight: 900,
+      lineHeight: 1,
+      textShadow: "0 2px 10px rgba(0,0,0,0.4)",
+    }}
+  >
+    {set || "-"}
+  </div>
+</div>
 
       </div>
 
       {/* BODY */}
       <div style={{ flex: 1, padding: 20 }}>
 
-        {phase === "work" ? (
-          <div style={{
-            height: "80vh",
-            display: "grid",
-            gridTemplateColumns: "repeat(2, 1fr)",
-            gridTemplateRows: "repeat(3, 1fr)",
-            gap: 45,
-            paddingTop: 50
-          }}>
-            {stations.slice(0, 6).map((st) => {
+      {phase === "work" ? (
+  <div
+    style={{
+      height: "80vh",          // 🔥 lebih rendah dari sebelumnya
+      maxHeight: "80vh",
+      display: "grid",
+      gridTemplateColumns: "repeat(2, 1fr)",
+      gridTemplateRows: "repeat(3, 1fr)",
+      gap: 50,                 // 🔥 lebih rapat (tidak terlalu renggang)
+      paddingTop: 50,          // 🔥 dihapus tinggi berlebih
+      overflow: "hidden",
+    }}
+  >
+    {stations.slice(0, 6).map((st) => {
 
-              const isActive =
-                state?.active_station_number === st.station_number &&
-                state?.phase === "work";
+      const isActive =
+        state?.active_station_number === st.station_number &&
+        state?.phase === "work";
 
-              const media = isActive
-                ? st.exercise?.video_url
-                : st.exercise?.thumbnail_url;
+      const media = isActive
+        ? st.exercise?.video_url
+        : st.exercise?.thumbnail_url;
 
-              return (
-                <div key={st.id} style={{ position: "relative", background: "#000" }}>
+      return (
+        <div
+          key={st.id}
+          style={{
+            position: "relative",
+            background: "#000",
+            borderRadius: 12,
+            overflow: "hidden",
+          }}
+        >
 
-                  {isActive ? (
-                    <video src={media} autoPlay muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  ) : (
-                    <img src={media} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  )}
+          {isActive ? (
+            <video
+              src={media}
+              autoPlay
+              muted
+              playsInline
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover", // 🔥 biar tidak terlalu “nempel”
+              }}
+            />
+          ) : (
+            <img
+              src={media}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+              }}
+            />
+          )}
 
-                  <div style={{
-                    position: "absolute",
-                    bottom: 10,
-                    left: 12,
-                    color: "white",
-                    fontSize: 48,
-                    fontWeight: 900
-                  }}>
-                    {st.station_number}
-                  </div>
-
-                </div>
-              );
-            })}
+          {/* 🔥 STATION LABEL FIXED */}
+          <div
+            style={{
+              position: "absolute",
+              bottom: 10,
+              left: 10,
+              background: "rgba(0,0,0,0.75)",
+              padding: "6px 14px",
+              borderRadius: 10,
+              color: "#fff",
+              fontSize: 54,
+              fontWeight: 900,
+              letterSpacing: 2,
+              textShadow: "0 2px 8px rgba(0,0,0,0.8)",
+            }}
+          >
+            {st.station_number}
           </div>
-        ) : (
-          item && (
-            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
-              <video src={item.exercise?.video_url} autoPlay muted playsInline style={{ width: "80%" }} />
-            </div>
-          )
-        )}
+
+        </div>
+      );
+    })}
+  </div>
+) : (
+  item && (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        height: "100%",
+      }}
+    >
+      <video
+        src={item.exercise?.video_url}
+        autoPlay
+        muted
+        playsInline
+        style={{
+          width: "80%",
+          borderRadius: 12,
+        }}
+      />
+    </div>
+  )
+)}
 
       </div>
 
       {/* OVERLAY */}
-      {(phase === "rest" || phase === "switch") && (
-        <div style={{
-          position: "absolute",
-          inset: 0,
-          background: phase === "rest" ? "#e74c3c" : "#f1c40f",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          flexDirection: "column"
-        }}>
-          <div style={{ fontSize: 100, color: "white" }}>
-            {phase.toUpperCase()}
-          </div>
-
-          <div style={{ fontSize: 150, color: "white" }}>
-            {timer}
-          </div>
-        </div>
+     
+    {(phase === "rest" || phase === "switch") && (
+  <div
+    style={{
+      position: "absolute",
+      inset: 0,
+      background: phase === "rest" ? "#e74c3c" : "#f1c40f",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      flexDirection: "column",
+      zIndex: 999,
+      color: "white",
+    }}
+  >
+    {/* ICON */}
+    <div style={{ marginBottom: 20 }}>
+      {phase === "rest" ? (
+        <MdTimer size={110} />
+      ) : (
+        <FaExchangeAlt size={110} />
       )}
+    </div>
+
+    {/* TEXT */}
+    <div
+      style={{
+        fontSize: 120,
+        fontWeight: 900,
+        letterSpacing: 4,
+        textTransform: "uppercase",
+        textShadow: "0 5px 20px rgba(0,0,0,0.4)",
+      }}
+    >
+      {phase}
+    </div>
+
+    {/* TIMER */}
+    <div
+      style={{
+        fontSize: 160,
+        fontWeight: 900,
+        marginTop: 10,
+        textShadow: "0 5px 20px rgba(0,0,0,0.4)",
+      }}
+    >
+      {timer}
+    </div>
+
+  
+  </div>
+)}
+
   
   {state?.status === "paused" && (
   <div style={{
