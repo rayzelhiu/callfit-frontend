@@ -13,13 +13,11 @@ export default function TvScreen() {
   const intervalRef = useRef(null);
   const prevPhase = useRef(null);
   const lastSoundKey = useRef(null);
+  const playedPhaseSoundAt3 = useRef(false);
 
   // ================= AUDIO UNLOCK =================
   useEffect(() => {
     const unlock = () => {
-      const audio = new Audio("/sounds/switch.mp3");
-
-      audio.play().catch(() => {});
       setUnlocked(true);
     };
 
@@ -71,29 +69,34 @@ export default function TvScreen() {
   };
 
   useEffect(() => {
-    if (!state?.phase || !unlocked) return;
+  if (!state?.phase || !unlocked) return;
 
-    const prev = prevPhase.current;
-    const current = state.phase;
+  // 🔥 RULE BARU: hanya jalan di detik 3
+  if (state.remaining_time !== 3) return;
 
-    if (!prev) {
-      prevPhase.current = current;
-      return;
-    }
+  const prev = prevPhase.current;
+  const current = state.phase;
 
-    const key = `${prev}-${current}`;
-    if (lastSoundKey.current === key) return;
-
-    if (prev === "warmup" && current === "work") play("/sounds/work.mp3");
-    if (prev === "work" && current === "switch") play("/sounds/switch.mp3");
-    if (prev === "rest" && current === "work") play("/sounds/switch.mp3");
-    if (prev === "work" && current === "rest") play("/sounds/work.mp3");
-    if (prev === "switch" && current === "cooldown") play("/sounds/cooldown.mp3");
-
-    lastSoundKey.current = key;
+  if (!prev) {
     prevPhase.current = current;
+    return;
+  }
 
-  }, [state?.phase]);
+  const key = `${prev}-${current}`;
+  if (lastSoundKey.current === key) return;
+
+  if (prev === "warmup" && current === "work") play("/sounds/work.mp3");
+  if (prev === "work" && current === "switch") play("/sounds/switch.mp3");
+  if (prev === "rest" && current === "work") play("/sounds/switch.mp3");
+  if (prev === "work" && current === "rest") play("/sounds/work.mp3");
+  if (prev === "switch" && current === "cooldown") play("/sounds/cooldown.mp3");
+
+  lastSoundKey.current = key;
+  prevPhase.current = current;
+
+}, [state?.phase, state?.remaining_time, unlocked]);
+
+
 
   // ================= SNAPSHOT TIMER (NO REALTIME MATH) =================
 useEffect(() => {
@@ -256,28 +259,21 @@ useEffect(() => {
       {/* BODY */}
       <div style={{ flex: 1, padding: 20 }}>
 
-      {phase === "work" ? (
+    {phase === "work" ? (
   <div
     style={{
-      height: "80vh",          // 🔥 lebih rendah dari sebelumnya
+      height: "80vh",
       maxHeight: "80vh",
       display: "grid",
       gridTemplateColumns: "repeat(2, 1fr)",
       gridTemplateRows: "repeat(3, 1fr)",
-      gap: 50,                 // 🔥 lebih rapat (tidak terlalu renggang)
-      paddingTop: 50,          // 🔥 dihapus tinggi berlebih
+      gap: 40,
       overflow: "hidden",
     }}
   >
     {stations.slice(0, 6).map((st) => {
 
-      const isActive =
-        state?.active_station_number === st.station_number &&
-        state?.phase === "work";
-
-      const media = isActive
-        ? st.exercise?.video_url
-        : st.exercise?.thumbnail_url;
+      const media = st.exercise?.video_url;
 
       return (
         <div
@@ -290,30 +286,21 @@ useEffect(() => {
           }}
         >
 
-          {isActive ? (
-            <video
-              src={media}
-              autoPlay
-              muted
-              playsInline
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover", // 🔥 biar tidak terlalu “nempel”
-              }}
-            />
-          ) : (
-            <img
-              src={media}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-              }}
-            />
-          )}
+          {/* 🔥 ALL VIDEO PLAY */}
+          <video
+            src={media}
+            autoPlay
+            muted
+            loop   // penting biar tidak stop
+            playsInline
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
+          />
 
-          {/* 🔥 STATION LABEL FIXED */}
+          {/* LABEL */}
           <div
             style={{
               position: "absolute",
@@ -338,28 +325,17 @@ useEffect(() => {
   </div>
 ) : (
   item && (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        height: "100%",
-      }}
-    >
+    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
       <video
         src={item.exercise?.video_url}
         autoPlay
         muted
         playsInline
-        style={{
-          width: "80%",
-          borderRadius: 12,
-        }}
+        style={{ width: "80%" }}
       />
     </div>
   )
 )}
-
       </div>
 
       {/* OVERLAY */}
@@ -421,7 +397,7 @@ useEffect(() => {
   <div style={{
     position: "absolute",
     inset: 0,
-    background: "rgba(0,0,0,0.85)",
+    background: "#3b82f6",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
