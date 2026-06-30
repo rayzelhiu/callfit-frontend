@@ -6,20 +6,34 @@ import { FaExchangeAlt } from "react-icons/fa";
 
 export default function TvScreen() {
 
+  // ================= STATE =================
   const [state, setState] = useState(null);
   const [unlocked, setUnlocked] = useState(false);
-  const [localRemaining, setLocalRemaining] = useState(0);
+  const audioPool = useRef({});
 
+
+  const [warmupIndex, setWarmupIndex] = useState(0);
+  const [cooldownIndex, setCooldownIndex] = useState(0);
+
+  const [displayTime, setDisplayTime] = useState(0);
+
+  // ================= REFS =================
   const intervalRef = useRef(null);
   const prevPhase = useRef(null);
   const lastSoundKey = useRef(null);
-  const playedPhaseSoundAt3 = useRef(false);
+  const soundLockRef = useRef(false);
 
-  // ================= AUDIO UNLOCK =================
+  const serverAnchor = useRef(null);
+  const lastSyncTime = useRef(null);
+
+  const phase = state?.phase;
+const set = state?.set;
+const context = state?.context;
+
+
+  // ================= UNLOCK =================
   useEffect(() => {
-    const unlock = () => {
-      setUnlocked(true);
-    };
+    const unlock = () => setUnlocked(true);
 
     window.addEventListener("click", unlock, { once: true });
     window.addEventListener("touchstart", unlock, { once: true });
@@ -39,40 +53,112 @@ export default function TvScreen() {
         const res = await api.get("/tv/current");
 
         if (res.data?.data) {
-          console.log("STATE FROM API:", res.data.data); // DEBUG
-          setState((prev) => {
           const next = res.data.data;
 
-          // freeze kalau paused
-          if (prev?.status === "paused" && next?.status === "running") {
-            return prev;
-          }
-
-          return next;
-        });
+          setState((prev) => {
+            if (prev?.status === "paused" && next?.status === "running") {
+              return prev;
+            }
+            return next;
+          });
         }
       } catch (err) {
-        console.log("FETCH ERROR:", err);
+        console.log(err);
       }
     };
 
     intervalRef.current = setInterval(fetchState, 1000);
-
     return () => clearInterval(intervalRef.current);
   }, [unlocked]);
 
-  // ================= AUDIO CONTROL =================
+  // ================= RESET INDEX =================
+  useEffect(() => {
+    if (state?.phase === "warmup") setWarmupIndex(0);
+    if (state?.phase === "cooldown") setCooldownIndex(0);
+  }, [state?.phase]);
+
+  // ================= WARMUP SEQUENCE =================
+  useEffect(() => {
+    if (state?.phase !== "warmup") return;
+    if (state?.remaining_time !== 1) return;
+
+    const max = state?.context?.warmups?.length || 0;
+
+    setWarmupIndex((prev) => {
+      if (prev + 1 >= max) return prev;
+      return prev + 1;
+    });
+  }, [state?.remaining_time, state?.phase]);
+
+  // ================= COOLDOWN SEQUENCE =================
+  useEffect(() => {
+    if (state?.phase !== "cooldown") return;
+    if (state?.remaining_time !== 1) return;
+
+    const max = state?.context?.cooldowns?.length || 0;
+
+    setCooldownIndex((prev) => {
+      if (prev + 1 >= max) return prev;
+      return prev + 1;
+    });
+  }, [state?.remaining_time, state?.phase]);
+
+  // ================= SMOOTH TIMER ENGINE =================
+  useEffect(() => {
+    if (!state) return;
+
+    serverAnchor.current = Date.now();
+    lastSyncTime.current = state.remaining_time;
+
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - serverAnchor.current) / 1000);
+      const base = lastSyncTime.current || state.remaining_time;
+
+      const next = Math.max(base - elapsed, 0);
+      setDisplayTime(next);
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [state?.phase, state?.remaining_time]);
+
+
+  // ================= AUDIO =================
   const play = (src) => {
+  const audio = audioPool.current[src];
+  if (!audio) return;
+
+  audio.pause();
+  audio.currentTime = 0;
+
+  const playPromise = audio.play();
+
+  if (playPromise !== undefined) {
+    playPromise.catch(() => {
+      console.log("audio blocked");
+    });
+  }
+};
+
+useEffect(() => {
+  const sounds = [
+    "/sounds/work.mp3",
+    "/sounds/switch.mp3",
+    "/sounds/cooldown.mp3",
+  ];
+
+  sounds.forEach((src) => {
     const audio = new Audio(src);
-    audio.volume = 0.8;
-    audio.play().catch(() => {});
-  };
+    audio.preload = "auto";
+    audioPool.current[src] = audio;
+  });
+}, []);
+
 
   useEffect(() => {
   if (!state?.phase || !unlocked) return;
 
-  // 🔥 RULE BARU: hanya jalan di detik 3
-  if (state.remaining_time !== 3) return;
+  // 🔥 jangan strict === 3
+  if (displayTime > 3 || displayTime < 2) return;
 
   const prev = prevPhase.current;
   const current = state.phase;
@@ -85,61 +171,44 @@ export default function TvScreen() {
   const key = `${prev}-${current}`;
   if (lastSoundKey.current === key) return;
 
-  if (prev === "warmup" && current === "work") play("/sounds/work.mp3");
-  if (prev === "work" && current === "switch") play("/sounds/switch.mp3");
-  if (prev === "rest" && current === "work") play("/sounds/switch.mp3");
-  if (prev === "work" && current === "rest") play("/sounds/work.mp3");
-  if (prev === "switch" && current === "cooldown") play("/sounds/cooldown.mp3");
+  const audio = new Audio(
+    prev === "warmup" && current === "work"
+      ? "/sounds/work.mp3"
+      : prev === "work" && current === "switch"
+      ? "/sounds/switch.mp3"
+      : prev === "rest" && current === "work"
+      ? "/sounds/switch.mp3"
+      : prev === "work" && current === "rest"
+      ? "/sounds/work.mp3"
+       : prev === "switch" && current === "work"
+      ? "/sounds/work.mp3"
+      : prev === "switch" && current === "cooldown"
+      ? "/sounds/cooldown.mp3"
+      : null
+  );
+
+  if (!audio.src) return;
+
+  audio.volume = 0.8;
+
+  audio.play().catch((e) => {
+    console.log("AUDIO BLOCKED:", e);
+  });
 
   lastSoundKey.current = key;
   prevPhase.current = current;
 
-}, [state?.phase, state?.remaining_time, unlocked]);
+}, [state?.phase, displayTime, unlocked]);
 
 
+  // ================= ITEMS =================
+  const warmupItem =
+    state?.context?.warmups?.[warmupIndex] || null;
 
-  // ================= SNAPSHOT TIMER (NO REALTIME MATH) =================
-useEffect(() => {
-  if (!state) return;
-  setLocalRemaining(state.remaining_time || 0);
-}, [state?.remaining_time, state?.status]);
+  const cooldownItem =
+    state?.context?.cooldowns?.[cooldownIndex] || null;
 
-
-const lastStatus = useRef(null);
-
-useEffect(() => {
-  if (!state) return;
-
-  if (state.status !== lastStatus.current) {
-    lastStatus.current = state.status;
-  }
-
-  setState((prev) => {
-    if (prev?.status === "paused" && state.status === "running") {
-      return prev; // BLOCK overwrite pause
-    }
-    return state;
-  });
-}, [state]);
-
-
-  const timer = state?.status === "paused"
-  ? state.remaining_time
-  : localRemaining;
-
-  const { phase, context, set } = state || {};
-  const stations = context?.stations || [];
-  const warmups = context?.warmups || [];
-  const cooldowns = context?.cooldowns || [];
-
-  const list =
-    phase === "warmup"
-      ? warmups
-      : phase === "cooldown"
-      ? cooldowns
-      : [];
-
-  const item = list?.[0] || null;
+  const stations = state?.context?.stations || [];
 
   // ================= UNLOCK SCREEN =================
   if (!unlocked) {
@@ -210,9 +279,9 @@ useEffect(() => {
           borderRadius: 18,
           fontSize: 110,
           fontWeight: "900",
-          color: timer <= 10 ? "#ff4d4d" : "#2ecc71",
+          color: displayTime <= 10 ? "#ff4d4d" : "#2ecc71",
         }}>
-          {timer}
+          {displayTime}
         </div>
 
         <div
@@ -257,86 +326,92 @@ useEffect(() => {
       </div>
 
       {/* BODY */}
-      <div style={{ flex: 1, padding: 20 }}>
+     <div style={{ flex: 1, padding: 20 }}>
 
-    {phase === "work" ? (
-  <div
-    style={{
-      height: "80vh",
-      maxHeight: "80vh",
-      display: "grid",
-      gridTemplateColumns: "repeat(2, 1fr)",
-      gridTemplateRows: "repeat(3, 1fr)",
-      gap: 40,
-      overflow: "hidden",
-    }}
-  >
-    {stations.slice(0, 6).map((st) => {
+  {phase === "work" && (
+    <div
+      style={{
+        height: "80vh",
+        maxHeight: "80vh",
+        display: "grid",
+        gridTemplateColumns: "repeat(2, 1fr)",
+        gridTemplateRows: "repeat(3, 1fr)",
+        gap: 40,
+        overflow: "hidden",
+      }}
+    >
+      {stations.slice(0, 6).map((st) => {
+        const media = st.exercise?.video_url;
 
-      const media = st.exercise?.video_url;
-
-      return (
-        <div
-          key={st.id}
-          style={{
-            position: "relative",
-            background: "#000",
-            borderRadius: 12,
-            overflow: "hidden",
-          }}
-        >
-
-          {/* 🔥 ALL VIDEO PLAY */}
-          <video
-            src={media}
-            autoPlay
-            muted
-            loop   // penting biar tidak stop
-            playsInline
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-            }}
-          />
-
-          {/* LABEL */}
+        return (
           <div
+            key={st.id}
             style={{
-              position: "absolute",
-              bottom: 10,
-              left: 10,
-              background: "rgba(0,0,0,0.75)",
-              padding: "6px 14px",
-              borderRadius: 10,
-              color: "#fff",
-              fontSize: 54,
-              fontWeight: 900,
-              letterSpacing: 2,
-              textShadow: "0 2px 8px rgba(0,0,0,0.8)",
+              position: "relative",
+              background: "#000",
+              borderRadius: 12,
+              overflow: "hidden",
             }}
           >
-            {st.station_number}
-          </div>
+            <video
+              src={media}
+              autoPlay
+              muted
+              loop
+              playsInline
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+              }}
+            />
 
-        </div>
-      );
-    })}
-  </div>
-) : (
-  item && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: 10,
+                left: 10,
+                background: "rgba(0,0,0,0.75)",
+                padding: "6px 14px",
+                borderRadius: 10,
+                color: "#fff",
+                fontSize: 54,
+                fontWeight: 900,
+              }}
+            >
+              {st.station_number}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  )}
+
+  {phase === "warmup" && warmupItem && (
     <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
       <video
-        src={item.exercise?.video_url}
+        src={warmupItem.exercise?.video_url}
         autoPlay
         muted
         playsInline
         style={{ width: "80%" }}
       />
     </div>
-  )
-)}
-      </div>
+  )}
+
+  {phase === "cooldown" && cooldownItem && (
+    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
+      <video
+        src={cooldownItem.exercise?.video_url}
+        autoPlay
+        muted
+        playsInline
+        style={{ width: "80%" }}
+      />
+    </div>
+  )}
+
+</div>
 
       {/* OVERLAY */}
      
@@ -385,7 +460,7 @@ useEffect(() => {
         textShadow: "0 5px 20px rgba(0,0,0,0.4)",
       }}
     >
-      {timer}
+      {displayTime}
     </div>
 
   
